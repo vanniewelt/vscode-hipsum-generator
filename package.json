@@ -16,7 +16,6 @@
   "contributes": {
     "commands": [
       {
-        "command": "hipsum-generator.generate",
         "title": "Hipster ipsum: Generate"
       }
     ]
