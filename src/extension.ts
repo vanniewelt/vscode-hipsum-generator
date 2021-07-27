@@ -3,8 +3,12 @@ import axios from "axios";
 
 const URL = "http://hipsum.co/api/";
 
+type HipsumType = "hipster-centric" | "hipster-latin";
+
+type HipsumUnit = "paras" | "sentences";
+
 interface HipsumParams {
-  type: "hipster-centric" | "hipster-latin";
+  type: HipsumType;
   paras?: number;
   sentences?: number;
   startWithLorem?: boolean;
@@ -41,26 +45,21 @@ async function fetchData({
   return data;
 }
 
-async function getSentencesOrParagraphs(): Promise<
-  "sentences" | "paragraphs" | undefined
-> {
-  const input = await vscode.window.showQuickPick<
-    vscode.QuickPickItem & { id: "sentences" | "paragraphs" }
-  >(
-    [
-      { id: "paragraphs", label: "Paragraphs" },
-      { id: "sentences", label: "Sentences" },
-    ],
-    {
-      title: "Do you want to insert a number of sentences or paragraphs?",
-    }
-  );
+async function getSentencesOrParas(): Promise<HipsumUnit | undefined> {
+  const options: Array<vscode.QuickPickItem & { id: HipsumUnit }> = [
+    { id: "paras", label: "Paragraphs" },
+    { id: "sentences", label: "Sentences" },
+  ];
+
+  const input = await vscode.window.showQuickPick(options, {
+    title: "Do you want to insert a number of sentences or paragraphs?",
+  });
 
   return input?.id;
 }
 
 async function getNumber(
-  sentencesOrParagraphs: "sentences" | "paragraphs"
+  sentencesOrParagraphs: HipsumUnit
 ): Promise<number | undefined> {
   const input = await vscode.window.showInputBox({
     title: `Enter number of ${sentencesOrParagraphs}`,
@@ -77,14 +76,14 @@ async function getNumber(
   return parseInt(input);
 }
 
-async function run(editor: vscode.TextEditor, edit: vscode.TextEditorEdit) {
-  const sentencesOrParapgraphs = await getSentencesOrParagraphs();
+async function run(editor: vscode.TextEditor) {
+  const sentencesOrParas = await getSentencesOrParas();
 
-  if (!sentencesOrParapgraphs) {
+  if (!sentencesOrParas) {
     return;
   }
 
-  const number = await getNumber(sentencesOrParapgraphs);
+  const number = await getNumber(sentencesOrParas);
 
   if (!number) {
     return;
@@ -101,14 +100,13 @@ async function run(editor: vscode.TextEditor, edit: vscode.TextEditorEdit) {
 
       const data = await fetchData({
         type: "hipster-centric",
-        [sentencesOrParapgraphs === "paragraphs" ? "paras" : "sentences"]:
-          number,
+        [sentencesOrParas]: number,
       });
 
       progress.report({ increment: 100 });
 
       const processedString = data
-        .join("\n\n") // Convert array of strings to string of double-newline separated paragraphs.
+        .join("\n\n") // Convert array of strings to string of double-newline separated paragraphs (like markdown).
         .replace("  ", " "); // hipsum.co API separates sentences with two spaces for some reason.
 
       editor.edit((builder) => {
@@ -124,7 +122,7 @@ export function activate(context: vscode.ExtensionContext) {
   // The commandId parameter must match the command field in package.json
   let disposable = vscode.commands.registerTextEditorCommand(
     "hipsum-generator.generate",
-    (editor, edit) => run(editor, edit)
+    (editor) => run(editor)
   );
 
   context.subscriptions.push(disposable);
